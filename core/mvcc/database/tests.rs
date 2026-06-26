@@ -16763,3 +16763,103 @@ fn test_checkpoint_seek_skip_divider_reinsert_loses_row() {
         );
     }
 }
+
+/// Regression test for issue #7639: an abandoned chunked DELETE under MVCC must
+/// not be able to commit a partial state that survives checkpoint + reopen and
+/// corrupts a table/index (here `sqlite_autoindex_t_2`).
+#[test]
+fn abandoned_chunked_delete_with_two_indexes_must_not_corrupt_after_checkpoint_reopen() {
+    fn scalar_i64(conn: &Arc<Connection>, sql: &str) -> i64 {
+        let mut stmt = conn.prepare(sql).unwrap();
+        loop {
+            match stmt.step().unwrap() {
+                StepResult::Row => return stmt.row().unwrap().get::<i64>(0).unwrap(),
+                StepResult::Yield => {}
+                StepResult::IO => panic!("unexpected IO while reading scalar"),
+                StepResult::Done => panic!("query returned no rows: {sql}"),
+                other => panic!("unexpected scalar step result: {other:?}"),
+            }
+        }
+    }
+
+    fn scalar_text(conn: &Arc<Connection>, sql: &str) -> String {
+        let mut stmt = conn.prepare(sql).unwrap();
+        loop {
+            match stmt.step().unwrap() {
+                StepResult::Row => return stmt.row().unwrap().get::<String>(0).unwrap(),
+                StepResult::Yield => {}
+                StepResult::IO => panic!("unexpected IO while reading scalar"),
+                StepResult::Done => panic!("query returned no rows: {sql}"),
+                other => panic!("unexpected scalar step result: {other:?}"),
+            }
+        }
+    }
+
+    fn abandon_delete_after_yields(conn: &Arc<Connection>, target_yields: usize) {
+        let mut delete_stmt = conn.prepare("DELETE FROM t").unwrap();
+        let mut explicit_yields = 0;
+        while explicit_yields < target_yields {
+            match delete_stmt.step().unwrap() {
+                StepResult::Yield => explicit_yields += 1,
+                StepResult::Done => panic!("DELETE finished before target yield {target_yields}"),
+                StepResult::IO => panic!("unexpected IO while reproducing public yield-only path"),
+                other => panic!("unexpected DELETE step result: {other:?}"),
+            }
+        }
+    }
+
+    let dir = tempfile::TempDir::new().unwrap();
+    let path = dir.path().join("repro.db");
+    let io = Arc::new(PlatformIO::new().unwrap());
+    let db = Database::open_file_with_flags(
+        io.clone(),
+        path.to_str().unwrap(),
+        OpenFlags::default(),
+        DatabaseOpts::new(),
+        None,
+    )
+    .unwrap();
+    let conn = db.connect().unwrap();
+
+    conn.execute("PRAGMA journal_mode = 'mvcc'").unwrap();
+    conn.execute("PRAGMA mvcc_checkpoint_threshold = -1")
+        .unwrap();
+    conn.execute("CREATE TABLE t(id INTEGER PRIMARY KEY, x UNIQUE, y UNIQUE)")
+        .unwrap();
+    conn.execute("CREATE TABLE marker(id INTEGER PRIMARY KEY)")
+        .unwrap();
+
+    conn.execute("BEGIN").unwrap();
+    for id in 1..=600 {
+        conn.execute(format!("INSERT INTO t VALUES({id},{id},{id})"))
+            .unwrap();
+    }
+    conn.execute("COMMIT").unwrap();
+    conn.execute("PRAGMA wal_checkpoint(TRUNCATE)").unwrap();
+
+    abandon_delete_after_yields(&conn, 3);
+    assert_eq!(scalar_i64(&conn, "SELECT count(*) FROM t"), 0);
+
+    conn.execute("INSERT INTO marker VALUES(1)").unwrap();
+    conn.execute("PRAGMA wal_checkpoint(TRUNCATE)").unwrap();
+    assert_eq!(scalar_i64(&conn, "SELECT count(*) FROM t"), 0);
+
+    drop(conn);
+    drop(db);
+
+    let reopened = Database::open_file_with_flags(
+        io,
+        path.to_str().unwrap(),
+        OpenFlags::default(),
+        DatabaseOpts::new(),
+        None,
+    )
+    .unwrap();
+    let reopened_conn = reopened.connect().unwrap();
+
+    let reopened_count = scalar_i64(&reopened_conn, "SELECT count(*) FROM t");
+    let integrity = scalar_text(&reopened_conn, "PRAGMA integrity_check");
+
+    assert_eq!(integrity, "ok");
+    assert_eq!(reopened_count, 0, "integrity={integrity}");
+}

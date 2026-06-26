@@ -1,0 +1,21 @@
+@database :memory:
+@requires-file trigger "temp trigger tests require trigger support"
+
+# Regression test for https://github.com/tursodatabase/turso/issues/7644
+#
+# ALTER TABLE ... RENAME COLUMN re-validates every trigger in the schema by
+# rewriting its SQL. A TEMP trigger lives in the temp database, but its target
+# table can live in the main (or an attached) database. The rewrite must resolve
+# the trigger's owning table in the database where the table actually lives, not
+# in the trigger's own (temp) database. Otherwise the lookup fails and a valid
+# RENAME COLUMN is rejected with "trigger table not found".
+
+test rename-column-with-temp-trigger {
+    CREATE TABLE t (a, b);
+    CREATE TEMP TRIGGER trg BEFORE UPDATE ON t BEGIN SELECT 1; END;
+    ALTER TABLE t RENAME COLUMN a TO a2;
+    SELECT group_concat(name) FROM pragma_table_info('t');
+}
+expect {
+    a2,b
+}

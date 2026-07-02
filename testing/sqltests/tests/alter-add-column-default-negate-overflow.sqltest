@@ -1,0 +1,23 @@
+# Regression test for https://github.com/tursodatabase/turso/issues/4621
+# Negating a hex literal that parses to i64::MIN in an ALTER TABLE ADD COLUMN
+# DEFAULT expression must not panic with "attempt to negate with overflow".
+# SQLite rejects this with "hex literal too big"; we expect a graceful error.
+
+@database :memory:
+
+test alter-add-column-default-negate-min-int {
+    CREATE TABLE t (a INTEGER);
+    ALTER TABLE t ADD COLUMN b DEFAULT -0x8000000000000000;
+}
+expect error {
+}
+
+test alter-add-column-default-negate-ok {
+    CREATE TABLE t2 (a INTEGER);
+    ALTER TABLE t2 ADD COLUMN b DEFAULT -0x1;
+    INSERT INTO t2 (a) VALUES (1);
+    SELECT b FROM t2;
+}
+expect {
+    -1
+}

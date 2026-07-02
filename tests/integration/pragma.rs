@@ -1,4 +1,4 @@
-use crate::common::{limbo_exec_rows, TempDatabase};
+use crate::common::{TempDatabase, limbo_exec_rows};
 use rusqlite::types::Value as RValue;
 #[cfg(not(target_vendor = "apple"))]
 use turso_core::LimboError;
@@ -389,6 +389,30 @@ fn test_pragma_cache_size_min_value(db: TempDatabase) {
         panic!("expected integer value");
     };
     assert_eq!(*value, 200);
+}
+
+#[turso_macros::test(mvcc)]
+fn test_pragma_cache_size_i32_min_order_by(db: TempDatabase) {
+    let conn = db.connect_limbo();
+
+    // Regression test for issue #7150: setting cache_size to i32::MIN and then
+    // running an ORDER BY query used to panic in op_sorter_open due to i32::abs()
+    // overflowing on i32::MIN.
+    let min_val = i32::MIN;
+    conn.execute(&format!("PRAGMA cache_size = {min_val}"))
+        .unwrap();
+    conn.execute("CREATE TABLE items (id TEXT)").unwrap();
+    conn.execute("INSERT INTO items VALUES ('b'), ('a')")
+        .unwrap();
+
+    let rows = limbo_exec_rows(&conn, "SELECT id FROM items ORDER BY id");
+    assert_eq!(
+        rows,
+        vec![
+            vec![RValue::Text("a".to_string())],
+            vec![RValue::Text("b".to_string())],
+        ]
+    );
 }
 
 #[turso_macros::test]

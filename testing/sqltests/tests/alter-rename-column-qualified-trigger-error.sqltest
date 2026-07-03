@@ -1,0 +1,11 @@
+@database :memory:
+
+@cross-check-integrity
+test rename-column-trigger-when-qualified-ref-error-message {
+    CREATE TABLE t (a, b);
+    CREATE TRIGGER tr BEFORE UPDATE ON t WHEN t.b > 0 BEGIN SELECT 1; END;
+    ALTER TABLE t RENAME COLUMN b TO c;
+}
+expect error {
+    no such column: t\.b
+}

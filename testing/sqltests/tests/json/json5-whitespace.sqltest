@@ -1,0 +1,72 @@
+@database :memory:
+
+# JSON5 (and SQLite) treat ECMAScript whitespace as whitespace:
+# NBSP (U+00A0), BOM (U+FEFF), line/paragraph separators (U+2028/U+2029),
+# Zs-category spaces, vertical tab, and form feed.
+# See https://github.com/tursodatabase/turso/issues/7753
+
+test json5-whitespace-nbsp {
+    select json(char(0x00A0)||'1');
+}
+expect {
+    1
+}
+
+test json5-whitespace-bom {
+    select json(char(0xFEFF)||'{"a":1}');
+}
+expect {
+    {"a":1}
+}
+
+test json5-whitespace-line-separator {
+    select json('[1,'||char(0x2028)||'2]');
+}
+expect {
+    [1,2]
+}
+
+test json5-whitespace-paragraph-separator {
+    select json('[1,'||char(0x2029)||'2]');
+}
+expect {
+    [1,2]
+}
+
+test json5-whitespace-zs-en-quad {
+    select json(char(0x2000)||'1');
+}
+expect {
+    1
+}
+
+test json5-whitespace-vertical-tab {
+    select json(char(0x000B)||'1');
+}
+expect {
+    1
+}
+
+test json5-whitespace-form-feed {
+    select json(char(0x000C)||'1');
+}
+expect {
+    1
+}
+
+# JSON5 string line continuations: backslash followed by CR or CRLF
+# is a line continuation, just like backslash followed by LF.
+
+test json5-line-continuation-cr {
+    select json('"he'||char(0x5C)||char(0x0D)||'llo"');
+}
+expect {
+    "hello"
+}
+
+test json5-line-continuation-crlf {
+    select json('"he'||char(0x5C)||char(0x0D)||char(0x0A)||'llo"');
+}
+expect {
+    "hello"
+}

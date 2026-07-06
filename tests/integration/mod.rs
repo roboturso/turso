@@ -10,6 +10,8 @@ mod fuzz_transaction;
 mod index_method;
 mod integrity_check;
 mod mvcc;
+#[cfg(feature = "io_memory_yield")]
+mod pager_savepoint_yield;
 mod pragma;
 mod query_processing;
 mod query_timeout;

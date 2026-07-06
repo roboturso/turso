@@ -1385,3 +1385,127 @@ fn test_mvcc_update_btree_only_row_after_truncate_checkpoint(
 
     Ok(())
 }
+
+/// Regression test for tursodatabase/turso#7159:
+/// "Slow Commit & Corrupt database: Missing MVCC metadata table while logical
+/// log state exists".
+///
+/// Under sustained concurrent write load (`BEGIN CONCURRENT` on many
+/// connections), the MVCC auto-checkpoint that fires at commit time when the
+/// logical log exceeds `mvcc_checkpoint_threshold` try-acquires
+/// `blocking_checkpoint_lock.write()`. That acquisition fails with `Busy`
+/// whenever any other transaction is active (every transaction read-holds the
+/// lock), and the commit path swallows the error. As a result, while writers
+/// keep the database busy, no auto-checkpoint ever succeeds and the logical
+/// log grows without bound. When load finally drops (e.g. at application
+/// shutdown), the first commit that manages to grab the lock checkpoints the
+/// entire accumulated log inline in its COMMIT, stalling for a time
+/// proportional to everything written since the last checkpoint — the
+/// reporter observed ~560 second commits with a 1.4 GB log.
+///
+/// This test runs several concurrent batch-insert writers with a small
+/// checkpoint threshold and asserts that the logical log stays bounded near
+/// the threshold instead of growing with the total volume written.
+#[test]
+fn test_mvcc_logical_log_bounded_under_concurrent_commits() -> anyhow::Result<()> {
+    const WORKERS: usize = 6;
+    const BATCHES: usize = 100;
+    const BATCH_SIZE: usize = 100;
+    /// Checkpoint threshold in bytes (PRAGMA mvcc_checkpoint_threshold).
+    const THRESHOLD: u64 = 64 * 1024;
+    /// Generous slack: a working auto-checkpoint keeps the log near
+    /// THRESHOLD; the bug lets it grow to the total bytes written (several
+    /// megabytes here, gigabytes for the reporter).
+    const MAX_ALLOWED_LOG_SIZE: u64 = THRESHOLD * 20;
+
+    fn is_retryable(e: &turso::Error) -> bool {
+        matches!(e, turso::Error::Busy(_) | turso::Error::BusySnapshot(_))
+            || matches!(e, turso::Error::Error(msg) if msg.contains("conflict") || msg.contains("Busy"))
+    }
+
+    let dir = tempfile::tempdir()?;
+    let db_path = dir.path().join("issue_7159.db");
+    let db_path_str = db_path.to_str().unwrap().to_string();
+    let log_path = dir.path().join("issue_7159.db-log");
+
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?;
+    let db = rt.block_on(async {
+        let db = turso::Builder::new_local(&db_path_str).build().await?;
+        let conn = db.connect()?;
+        conn.pragma_update("journal_mode", "'mvcc'").await?;
+        conn.pragma_update("mvcc_checkpoint_threshold", THRESHOLD.to_string())
+            .await?;
+        conn.execute(
+            "CREATE TABLE events (id INTEGER PRIMARY KEY, payload TEXT)",
+            (),
+        )
+        .await?;
+        Ok::<_, turso::Error>(db)
+    })?;
+
+    let max_log_size = Arc::new(std::sync::atomic::AtomicU64::new(0));
+    let mut handles = Vec::new();
+    for w in 0..WORKERS {
+        let db = db.clone();
+        let log_path = log_path.clone();
+        let max_log_size = max_log_size.clone();
+        handles.push(std::thread::spawn(move || -> anyhow::Result<()> {
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()?;
+            rt.block_on(async move {
+                let conn = db.connect()?;
+                for b in 0..BATCHES {
+                    let base = (w * BATCHES + b) * BATCH_SIZE;
+                    'retry: loop {
+                        conn.execute("BEGIN CONCURRENT", ()).await?;
+                        for i in 0..BATCH_SIZE {
+                            let id = (base + i + 1) as i64;
+                            if let Err(e) = conn
+                                .execute(
+                                    "INSERT INTO events VALUES (?, 'payload-payload-payload-payload')",
+                                    [turso::Value::Integer(id)],
+                                )
+                                .await
+                            {
+                                let _ = conn.execute("ROLLBACK", ()).await;
+                                if is_retryable(&e) {
+                                    continue 'retry;
+                                }
+                                anyhow::bail!("insert failed: {e}");
+                            }
+                        }
+                        match conn.execute("COMMIT", ()).await {
+                            Ok(_) => break,
+                            Err(e) if is_retryable(&e) => {
+                                let _ = conn.execute("ROLLBACK", ()).await;
+                                continue 'retry;
+                            }
+                            Err(e) => anyhow::bail!("commit failed: {e}"),
+                        }
+                    }
+                    if let Ok(meta) = std::fs::metadata(&log_path) {
+                        max_log_size
+                            .fetch_max(meta.len(), std::sync::atomic::Ordering::Relaxed);
+                    }
+                }
+                Ok(())
+            })
+        }));
+    }
+    for handle in handles {
+        handle.join().expect("worker panicked")?;
+    }
+
+    let max_seen = max_log_size.load(std::sync::atomic::Ordering::Relaxed);
+    assert!(
+        max_seen <= MAX_ALLOWED_LOG_SIZE,
+        "MVCC auto-checkpoint starved under concurrent load: logical log grew to \
+         {max_seen} bytes despite a checkpoint threshold of {THRESHOLD} bytes \
+         (allowed at most {MAX_ALLOWED_LOG_SIZE}). Commits pay for the whole \
+         accumulated log at once when load drops (issue #7159)."
+    );
+    Ok(())
+}

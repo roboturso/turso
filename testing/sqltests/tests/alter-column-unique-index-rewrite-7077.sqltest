@@ -1,0 +1,35 @@
+@database :memory:
+
+# Regression test for https://github.com/tursodatabase/turso/issues/7077
+# ALTER COLUMN rewrote table rows but not secondary (UNIQUE) index entries,
+# leaving stale index keys that later caused DELETE/UPDATE corruption errors.
+
+@skip-if sqlite "ALTER COLUMN is a Turso extension"
+@cross-check-integrity
+test alter-column-unique-index-delete-no-corruption {
+    CREATE TABLE p(a, b UNIQUE);
+    INSERT INTO p VALUES(1, 10);
+    ALTER TABLE p ALTER COLUMN b TO g AS (a + 1);
+    SELECT rowid, a, g FROM p;
+    DELETE FROM p;
+    SELECT count(*) FROM p;
+}
+expect {
+    1|1|2
+    0
+}
+
+@skip-if sqlite "ALTER COLUMN is a Turso extension"
+@cross-check-integrity
+test alter-column-unique-index-update-no-corruption {
+    CREATE TABLE p(a, b UNIQUE);
+    INSERT INTO p VALUES(1, 10);
+    ALTER TABLE p ALTER COLUMN b TO g AS (a + 1);
+    UPDATE p SET a = 5;
+    SELECT rowid, a, g FROM p;
+    PRAGMA integrity_check;
+}
+expect {
+    1|5|6
+    ok
+}

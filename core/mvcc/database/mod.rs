@@ -82,6 +82,8 @@ use super::portable_logical::{
 #[cfg(test)]
 pub mod hermitage_tests;
 #[cfg(test)]
+pub mod issue_7483_tests;
+#[cfg(test)]
 pub mod tests;
 
 /// Sentinel value for `MvStore::exclusive_tx` indicating no exclusive transaction is active.

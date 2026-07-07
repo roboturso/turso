@@ -1,0 +1,42 @@
+# Regression test for issue #7786: JSON functions corrupt multi-byte UTF-8
+# when the string also contains a control character that JSON escapes
+# (e.g. \n, \t, \r). The bytes were decoded as latin1 during serialization,
+# so 'ä' (0xC3 0xA4) came back as 'Ã¤'.
+@database :memory:
+
+test json-object-multibyte-utf8-with-newline-issue-7786 {
+    SELECT json_object('k', 'ä' || char(10));
+}
+expect {
+    {"k":"ä\n"}
+}
+
+test json-array-multibyte-utf8-with-tab-issue-7786 {
+    SELECT json_array('ä' || char(9));
+}
+expect {
+    ["ä\t"]
+}
+
+test json-object-multibyte-utf8-with-carriage-return-issue-7786 {
+    SELECT json_object('k', 'é' || char(13));
+}
+expect {
+    {"k":"é\r"}
+}
+
+test json-group-array-multibyte-utf8-with-newline-issue-7786 {
+    CREATE TABLE t(v TEXT);
+    INSERT INTO t VALUES ('ä' || char(10));
+    SELECT json_group_array(v) FROM t;
+}
+expect {
+    ["ä\n"]
+}
+
+test json-object-three-byte-utf8-with-newline-issue-7786 {
+    SELECT json_object('k', '€' || char(10));
+}
+expect {
+    {"k":"€\n"}
+}

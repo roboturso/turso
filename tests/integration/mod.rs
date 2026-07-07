@@ -11,6 +11,7 @@ mod functions;
 mod fuzz_transaction;
 mod index_method;
 mod integrity_check;
+mod issue_7474_mvcc_rowid_rollback;
 mod mvcc;
 mod pragma;
 mod query_processing;

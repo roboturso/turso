@@ -1,4 +1,5 @@
 mod abandoned_create_index;
+mod alter_column_index;
 mod assert_details;
 mod attach;
 mod common;

@@ -12,6 +12,7 @@ mod functions;
 mod fuzz_transaction;
 mod index_method;
 mod integrity_check;
+mod issue_7638_mvcc_gc_resurrects_row;
 mod mvcc;
 mod pragma;
 mod query_processing;

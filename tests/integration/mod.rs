@@ -23,6 +23,7 @@ mod statement_reset;
 mod stmt_journal;
 mod stmt_readonly;
 mod storage;
+mod table_interior_drop_reuse;
 mod trigger;
 mod wal;
 

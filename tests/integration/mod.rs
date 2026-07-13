@@ -24,6 +24,7 @@ mod stmt_journal;
 mod stmt_readonly;
 mod storage;
 mod trigger;
+mod upsert_do_update_index_corruption;
 mod wal;
 
 #[cfg(test)]

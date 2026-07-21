@@ -1,0 +1,30 @@
+@database :memory:
+
+# Regression tests for https://github.com/tursodatabase/turso/issues/7934
+#
+# When the operands of a binary comparison operator have mismatched row-value
+# arities, SQLite reports "row value misused". Turso used to leak the internal
+# arity counts into the error message instead, e.g.:
+#   all arguments to binary operator > must return the same number of values.
+#   Got: (1) > (2)
+
+test binary-op-row-value-arity-mismatch-error-message {
+    SELECT count(*) > ('abc', 'def');
+}
+expect error {
+    row value misused
+}
+
+test binary-op-row-value-arity-mismatch-eq-error-message {
+    SELECT 1 = (1, 2);
+}
+expect error {
+    row value misused
+}
+
+test binary-op-row-value-arity-mismatch-lhs-error-message {
+    SELECT ('a', 'b') < 3;
+}
+expect error {
+    row value misused
+}

@@ -12,6 +12,7 @@ mod functions;
 mod fuzz_transaction;
 mod index_method;
 mod integrity_check;
+mod issue_7994_no_such_column_casing;
 mod mvcc;
 mod pragma;
 mod query_processing;

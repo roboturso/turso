@@ -1,0 +1,26 @@
+@database :memory:
+
+# Regression test for https://github.com/tursodatabase/turso/issues/7918
+# HAVING referencing an aggregate with a scalar subquery in its FILTER clause
+# must not silently drop rows.
+
+setup filter-subquery {
+    CREATE TABLE t (id INTEGER PRIMARY KEY, r REAL);
+    INSERT INTO t VALUES (1, 2.5);
+}
+
+@setup filter-subquery
+test issue-7918-having-agg-filter-scalar-subquery {
+    SELECT id FROM t GROUP BY id HAVING AVG(r) FILTER (WHERE (SELECT 1)) != 0;
+}
+expect {
+    1
+}
+
+@setup filter-subquery
+test issue-7918-agg-filter-scalar-subquery-no-having {
+    SELECT id, AVG(r) FILTER (WHERE (SELECT 1)) FROM t GROUP BY id;
+}
+expect {
+    1|2.5
+}

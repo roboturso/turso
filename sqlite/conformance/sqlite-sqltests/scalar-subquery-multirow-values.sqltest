@@ -1,0 +1,28 @@
+@database :memory:
+
+# https://github.com/tursodatabase/turso/issues/7976
+# A multi-row VALUES clause used as a scalar subquery must evaluate to
+# the first row, not the last.
+
+test scalar-subquery-multirow-values {
+    SELECT (VALUES(1),(2),(3));
+}
+expect {
+    1
+}
+
+test scalar-subquery-multirow-values-expr {
+    SELECT 10 + (VALUES('a'),('b'),('c'));
+}
+expect {
+    10
+}
+
+test scalar-subquery-multirow-values-in-insert {
+    CREATE TABLE t1(x);
+    INSERT INTO t1 VALUES ((VALUES(7),(8),(9)));
+    SELECT x FROM t1;
+}
+expect {
+    7
+}

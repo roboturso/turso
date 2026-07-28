@@ -1,0 +1,30 @@
+@database :memory:
+
+# Regression test for https://github.com/tursodatabase/turso/issues/5233
+#
+# A JOIN with an ON clause and an ungrouped aggregate panicked when the left
+# table was empty: the autoindex cursor for the join is opened inside the loop
+# body (in a Once block), so when Rewind skips the loop entirely the cursor is
+# never opened, but the post-loop aggregation path still tried to read a
+# non-aggregate column from it via Column, panicking with "cursor id N is
+# None".
+
+setup empty-table {
+    CREATE TABLE t(x);
+}
+
+@setup empty-table
+test left-join-empty-table-ungrouped-aggregate {
+    SELECT b.x, COUNT(*) FROM t a LEFT JOIN t b ON a.x=b.x;
+}
+expect {
+    |0
+}
+
+@setup empty-table
+test inner-join-empty-table-ungrouped-aggregate {
+    SELECT b.x, COUNT(*) FROM t a JOIN t b ON a.x=b.x;
+}
+expect {
+    |0
+}

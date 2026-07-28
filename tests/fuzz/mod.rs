@@ -3,6 +3,7 @@ pub mod custom_types;
 pub mod expression_index;
 pub mod grammar_generator;
 pub mod helpers;
+pub mod issue_6655;
 pub mod join;
 pub mod journal_mode;
 pub mod mvcc_rowid_allocator;

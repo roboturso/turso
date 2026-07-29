@@ -7,6 +7,8 @@ use crate::sync::RwLock;
 use crate::turso_assert;
 use std::fmt::Debug;
 
+#[cfg(test)]
+mod issue_7993_truncate_durability_test;
 pub mod logical_log;
 use crate::mvcc::database::{LogRecord, RowVersion};
 use crate::mvcc::persistent_storage::logical_log::{

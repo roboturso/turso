@@ -3,6 +3,7 @@ mod abandoned_statement_pager;
 mod assert_details;
 mod attach;
 mod common;
+mod compound_select_stack_overflow;
 mod conflict_resolution;
 mod custom_types;
 mod database;

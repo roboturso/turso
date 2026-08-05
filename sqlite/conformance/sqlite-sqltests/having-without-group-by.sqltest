@@ -1,0 +1,44 @@
+@database :memory:
+
+# Regression test for https://github.com/tursodatabase/turso/issues/8200
+#
+# An aggregate query with a HAVING clause but no GROUP BY must treat the
+# whole table as a single group. When the HAVING clause references a bare
+# table column, Turso returned no rows while SQLite returns the aggregate
+# row (upstream select3-3.3).
+
+setup logs {
+    CREATE TABLE t1 (log int);
+    INSERT INTO t1 VALUES (1), (2), (3);
+}
+
+@setup logs
+test having-bare-column-true {
+    SELECT count(*) FROM t1 HAVING log != 400;
+}
+expect {
+    3
+}
+
+@setup logs
+test having-bare-column-false {
+    SELECT count(*) FROM t1 HAVING log = 400;
+}
+expect {
+}
+
+@setup logs
+test having-aggregate-no-group-by {
+    SELECT max(log) FROM t1 HAVING count(*) > 2;
+}
+expect {
+    3
+}
+
+@setup logs
+test having-aggregate-on-column {
+    SELECT count(*) FROM t1 HAVING min(log) > 0;
+}
+expect {
+    3
+}

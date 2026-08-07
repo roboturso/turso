@@ -4,3 +4,4 @@ mod test_json_malformed_blob;
 mod test_sum;
 mod test_uuid;
 mod test_wal_api;
+mod test_wal_watermark_below_backfill;

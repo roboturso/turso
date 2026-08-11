@@ -1,3 +1,6 @@
+#[cfg(all(feature = "fts", not(target_family = "wasm")))]
+mod fts_with_keys_issue_8169;
+
 use std::collections::HashMap;
 #[cfg(all(feature = "fts", feature = "test_helper", not(target_family = "wasm")))]
 use std::sync::Arc;

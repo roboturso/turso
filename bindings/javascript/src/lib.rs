@@ -1028,6 +1028,9 @@ fn to_js_value<'a>(
     }
 }
 
+#[cfg(all(test, feature = "test_helper"))]
+mod issue_8341_yield_step_test;
+
 #[cfg(test)]
 mod tests {
     use super::apply_experimental_features;

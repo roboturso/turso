@@ -21,6 +21,7 @@ mod query_processing;
 mod query_timeout;
 mod queued_io;
 mod reindex;
+mod returning_error_rollback;
 mod statement_metadata;
 mod statement_reset;
 mod stmt_journal;

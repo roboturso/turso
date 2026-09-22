@@ -15,6 +15,7 @@ mod functions;
 mod fuzz_transaction;
 mod index_method;
 mod integrity_check;
+mod json_error_keeps_transaction;
 mod mvcc;
 mod pragma;
 mod query_processing;

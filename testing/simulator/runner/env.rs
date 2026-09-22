@@ -933,6 +933,10 @@ impl<'a> DerefMut for ShadowTablesMut<'a> {
 }
 
 #[cfg(test)]
+#[path = "savepoint_snapshot_issue_9001.rs"]
+mod savepoint_snapshot_issue_9001;
+
+#[cfg(test)]
 mod tests {
     use super::*;
 

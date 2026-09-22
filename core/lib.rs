@@ -29,6 +29,13 @@ pub mod json;
     host_shared_wal,
     any(not(target_os = "windows"), feature = "experimental_win_iocp")
 ))]
+mod multiprocess_empty_wal_stale_tshm_tests;
+#[cfg(all(
+    test,
+    feature = "fs",
+    host_shared_wal,
+    any(not(target_os = "windows"), feature = "experimental_win_iocp")
+))]
 mod multiprocess_tests;
 pub mod mvcc;
 #[cfg(any(feature = "fuzz", feature = "bench"))]

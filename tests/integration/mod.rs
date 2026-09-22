@@ -14,6 +14,7 @@ mod external_apis;
 mod functions;
 mod fuzz_transaction;
 mod index_method;
+mod insert_or_fail_statement_rollback;
 mod integrity_check;
 mod mvcc;
 mod pragma;

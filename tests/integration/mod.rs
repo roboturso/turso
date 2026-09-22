@@ -28,6 +28,7 @@ mod stmt_readonly;
 mod storage;
 mod suspended_statement_checkpoint;
 mod trigger;
+mod trigger_or_ignore_nested_delete;
 mod unreliable_io;
 mod views;
 mod wal;

@@ -1,0 +1,41 @@
+@database :memory:
+
+# A statement's OR IGNORE conflict policy propagates into the triggers it
+# fires, but a DELETE inside a trigger body always fires its own triggers with
+# the default (ABORT) policy — SQLite codes row-delete triggers with OE_Default
+# (delete.c). So when an INSERT OR IGNORE fires a BEFORE trigger whose DELETE
+# fires an AFTER DELETE trigger whose UPDATE hits a UNIQUE index, the whole
+# statement must fail. Turso used to let the outer OR IGNORE reach that UPDATE,
+# ignore the violation, and keep both the deleted row and the new row.
+
+test or-ignore-does-not-cross-delete-trigger {
+    CREATE TABLE t(id INTEGER PRIMARY KEY, k INTEGER);
+    CREATE UNIQUE INDEX i1 ON t(k);
+    CREATE TABLE u(x INTEGER);
+    INSERT INTO t VALUES(1,10),(2,20);
+    INSERT INTO u VALUES(1);
+    CREATE TRIGGER tg0 BEFORE INSERT ON t BEGIN DELETE FROM u WHERE x=1; END;
+    CREATE TRIGGER tg1 AFTER DELETE ON u BEGIN UPDATE t SET k=k*2 WHERE id=1; END;
+    INSERT OR IGNORE INTO t VALUES(3,30);
+}
+expect error {
+}
+
+# When the outer statement fires a trigger whose UPDATE conflicts directly
+# (no DELETE in between), the outer OR IGNORE does reach that UPDATE and the
+# violation is ignored, so the statement succeeds.
+test or-ignore-still-reaches-a-trigger-update-directly {
+    CREATE TABLE t(id INTEGER PRIMARY KEY, k INTEGER);
+    CREATE UNIQUE INDEX i1 ON t(k);
+    CREATE TABLE v(x INTEGER);
+    INSERT INTO t VALUES(1,10),(2,20);
+    CREATE TRIGGER tg2 AFTER INSERT ON v BEGIN UPDATE t SET k=10 WHERE id=2; END;
+    INSERT OR IGNORE INTO v VALUES(1);
+    SELECT count(*) FROM v;
+    SELECT id, k FROM t ORDER BY id;
+}
+expect {
+    1
+    1|10
+    2|20
+}

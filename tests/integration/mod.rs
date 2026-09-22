@@ -29,6 +29,7 @@ mod storage;
 mod suspended_statement_checkpoint;
 mod trigger;
 mod unreliable_io;
+mod upsert_or_rollback_keeps_transaction;
 mod views;
 mod wal;
 

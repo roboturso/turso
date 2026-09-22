@@ -1,0 +1,57 @@
+@database :memory:
+
+test json-each-value-decodes-string-escapes {
+    SELECT key, value, hex(value), length(value)
+    FROM json_each('["plain","with \"quotes\"","back\\\\slash"]');
+}
+expect {
+    0|plain|706C61696E|5
+    1|with "quotes"|77697468202271756F74657322|13
+    2|back\slash|6261636B5C736C617368|10
+}
+
+test json-each-value-decodes-newline-and-unicode-escapes {
+    SELECT key, hex(value), length(value)
+    FROM json_each('["new\nline","ctrl\u0001end"]');
+}
+expect {
+    0|6E65770A6C696E65|8
+    1|6374726C01656E64|8
+}
+
+test json-each-atom-and-cast-decode-string-escapes {
+    SELECT atom, CAST(value AS TEXT) FROM json_each('["with \"quotes\""]');
+}
+expect {
+    with "quotes"|with "quotes"
+}
+
+test json-each-key-decodes-newline-escape {
+    SELECT hex(key) FROM json_each('{"a\nb":1}');
+}
+expect {
+    610A62
+}
+
+test json-each-key-decodes-all-string-escapes {
+    SELECT key, hex(key) FROM json_each('{"q\"q":1,"b\\\\s":2,"uA":3}');
+}
+expect {
+    q"q|712271
+    b\s|625C73
+    uA|7541
+}
+
+test json-each-key-decodes-tab-escape {
+    SELECT hex(key) FROM json_each('{"t\tt":4}');
+}
+expect {
+    740974
+}
+
+test json-tree-key-decodes-newline-escape {
+    SELECT hex(key) FROM json_tree('{"a\nb":1}') WHERE key IS NOT NULL;
+}
+expect {
+    610A62
+}

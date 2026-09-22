@@ -9,6 +9,7 @@ mod common;
 mod conflict_resolution;
 mod custom_types;
 mod database;
+mod drop_index_mixed_case_sqlite_schema;
 mod expr_depth_stack_overflow;
 mod external_apis;
 mod functions;

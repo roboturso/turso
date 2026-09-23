@@ -253,6 +253,8 @@ use crate::{
 use crate::storage::encryption::EncryptionContext;
 use crate::File;
 
+#[cfg(all(test, feature = "conn_raw_api"))]
+mod header_upgrade_failure_tests;
 mod serializer;
 use serializer::EncryptedPayload;
 #[cfg(feature = "conn_raw_api")]

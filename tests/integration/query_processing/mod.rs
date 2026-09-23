@@ -1,3 +1,4 @@
+mod test_alter_table_fk_no_parent_columns;
 mod test_alter_table_reopen;
 mod test_btree;
 mod test_ddl;
